@@ -67,37 +67,49 @@ export function DeepfakeSection() {
     setResult(null);
 
     try {
-      // Simulating API call - replace with actual endpoint
-      // const formData = new FormData();
-      // formData.append('video', videoFile);
-      // const response = await fetch('/api/deepfake', {
-      //   method: 'POST',
-      //   body: formData,
-      // });
-      // const data = await response.json();
-
-      // Simulated response for demo
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      const fakeScore = Math.random() * 100;
-      const isFake = fakeScore > 50;
+      const formData = new FormData();
+      formData.append('file', videoFile);
       
+      const response = await fetch('http://localhost:8000/api/deepfake-detect', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Analysis failed: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Map backend response to component state
       setResult({
-        isFake,
-        confidence: isFake ? fakeScore : 100 - fakeScore,
-        details: isFake 
-          ? 'Facial inconsistencies detected around eye movement and lip sync patterns. The audio waveform shows signs of synthesis.'
-          : 'No significant manipulation markers detected. Facial movements and audio appear consistent with authentic recordings.',
+        isFake: !data.is_real,  // Backend returns is_real, we need isFake
+        confidence: data.confidence * 100,  // Convert to percentage
+        details: data.is_real
+          ? 'No significant manipulation markers detected. Facial movements appear consistent with authentic recordings.'
+          : 'Potential deepfake detected. Facial inconsistencies and synthesis patterns identified.',
+      });
+      
+      toast({
+        title: data.is_real ? 'Video Appears Real' : 'Deepfake Detected',
+        description: `Confidence: ${(data.confidence * 100).toFixed(2)}%`,
+        variant: data.is_real ? 'default' : 'destructive',
       });
     } catch (error) {
+      console.error('Analysis error:', error);
       toast({
         title: 'Analysis Failed',
-        description: 'Unable to analyze the video. Please try again.',
+        description: error instanceof Error 
+          ? error.message 
+          : 'Unable to analyze the video. Make sure the backend is running on port 8000.',
         variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
     }
   };
+
+
 
   const handleReset = () => {
     setVideoFile(null);
