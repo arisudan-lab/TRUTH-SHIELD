@@ -67,10 +67,14 @@ export function DeepfakeSection() {
     setResult(null);
 
     try {
+      // 1. Get the API URL from environment variables
+      const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+      
       const formData = new FormData();
       formData.append('file', videoFile);
       
-      const response = await fetch('http://localhost:8000/api/deepfake-detect', {
+      // 2. Use the dynamic URL instead of localhost
+      const response = await fetch(`${API_BASE_URL}/api/deepfake-detect`, {
         method: 'POST',
         body: formData,
       });
@@ -81,10 +85,9 @@ export function DeepfakeSection() {
       
       const data = await response.json();
       
-      // Map backend response to component state
       setResult({
-        isFake: !data.is_real,  // Backend returns is_real, we need isFake
-        confidence: data.confidence * 100,  // Convert to percentage
+        isFake: !data.is_real,
+        confidence: data.confidence * 100,
         details: data.is_real
           ? 'No significant manipulation markers detected. Facial movements appear consistent with authentic recordings.'
           : 'Potential deepfake detected. Facial inconsistencies and synthesis patterns identified.',
@@ -99,17 +102,13 @@ export function DeepfakeSection() {
       console.error('Analysis error:', error);
       toast({
         title: 'Analysis Failed',
-        description: error instanceof Error 
-          ? error.message 
-          : 'Unable to analyze the video. Make sure the backend is running on port 8000.',
+        description: 'Unable to analyze the video. Please check your connection and try again.',
         variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
     }
   };
-
-
 
   const handleReset = () => {
     setVideoFile(null);
@@ -129,7 +128,6 @@ export function DeepfakeSection() {
       ref={ref}
       className="min-h-screen py-24 relative"
     >
-      {/* Background Accent */}
       <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1/3 h-96 bg-gradient-to-l from-accent/5 to-transparent blur-3xl" />
 
       <div className="container mx-auto px-4">
@@ -137,7 +135,6 @@ export function DeepfakeSection() {
           'max-w-4xl mx-auto',
           isVisible ? 'fade-in-up' : 'opacity-0'
         )}>
-          {/* Section Header */}
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 border border-accent/20 mb-4">
               <Video className="w-4 h-4 text-accent" />
@@ -151,9 +148,7 @@ export function DeepfakeSection() {
             </p>
           </div>
 
-          {/* Main Content Grid */}
           <div className="grid md:grid-cols-2 gap-8">
-            {/* Upload Side */}
             <div className={cn(
               'glass-card p-6',
               isVisible ? 'slide-in-left' : 'opacity-0'
@@ -242,7 +237,6 @@ export function DeepfakeSection() {
               </div>
             </div>
 
-            {/* Result Side */}
             <div className={cn(
               isVisible ? 'slide-in-right animation-delay-200' : 'opacity-0'
             )}>

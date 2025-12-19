@@ -34,7 +34,11 @@ export function FakeNewsSection() {
     setResult(null);
 
     try {
-      const response = await fetch('/api/predict', {
+      // 1. Get the API URL from environment variables
+      const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
+      // 2. Use the full URL for the fetch call
+      const response = await fetch(`${API_BASE_URL}/api/predict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
@@ -45,15 +49,9 @@ export function FakeNewsSection() {
       }
 
       const data = await response.json();
-      // data: { prediction: "Real"|"Fake", confidence: 0-1, is_real: boolean }
-
+      
       const isFake = !data.is_real;
       const confidencePercent = data.confidence * 100;
-
-      // If FAKE: confidence = fake probability, authenticity = 100 - confidence
-      // If REAL: confidence = authenticity score, fake probability = 100 - confidence
-      const fakeProbability = isFake ? confidencePercent : (100 - confidencePercent);
-      const authenticityScore = isFake ? (100 - confidencePercent) : confidencePercent;
 
       setResult({
         isFake,
@@ -73,7 +71,6 @@ export function FakeNewsSection() {
     }
   };
 
-
   const handleReset = () => {
     setText('');
     setResult(null);
@@ -85,7 +82,6 @@ export function FakeNewsSection() {
       ref={ref}
       className="min-h-screen py-24 relative"
     >
-      {/* Background Accent */}
       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1/3 h-96 bg-gradient-to-r from-primary/5 to-transparent blur-3xl" />
 
       <div className="container mx-auto px-4">
@@ -93,7 +89,6 @@ export function FakeNewsSection() {
           'max-w-4xl mx-auto',
           isVisible ? 'fade-in-up' : 'opacity-0'
         )}>
-          {/* Section Header */}
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-4">
               <FileText className="w-4 h-4 text-primary" />
@@ -107,9 +102,7 @@ export function FakeNewsSection() {
             </p>
           </div>
 
-          {/* Main Content Grid */}
           <div className="grid md:grid-cols-2 gap-8">
-            {/* Input Side */}
             <div className={cn(
               'glass-card p-6',
               isVisible ? 'slide-in-left' : 'opacity-0'
@@ -155,7 +148,6 @@ export function FakeNewsSection() {
               </div>
             </div>
 
-            {/* Result Side */}
             <div className={cn(
               isVisible ? 'slide-in-right animation-delay-200' : 'opacity-0'
             )}>
