@@ -8,7 +8,7 @@ import tempfile
 import os
 from keras.models import load_model
 
-app = FastAPI(title="TruthGuard - Fake News & Deepfake Detector")
+app = FastAPI(title="TRUTH-SHIELD - Fake News & Deepfake Detector")
 
 # CORS setup
 origins = [
@@ -36,7 +36,7 @@ class NewsRequest(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"message": "TruthGuard API is running"}
+    return {"message": "TRUTH-SHIELD API is running"}
 
 @app.post("/api/predict")
 async def predict(news: NewsRequest):
@@ -70,7 +70,8 @@ def extract_frames(video_path, num_frames=10):
         cap.set(cv2.CAP_PROP_POS_FRAMES, i * (total // num_frames))
         ret, frame = cap.read()
         if ret:
-            frames.append(cv2.resize(frame, (224, 224)) / 255.0)
+            # CHANGE THIS LINE: from (224, 224) to (128, 128)
+            frames.append(cv2.resize(frame, (128, 128)) / 255.0)
     cap.release()
     return np.array(frames) if frames else None
 
@@ -80,7 +81,7 @@ async def detect_deepfake(file: UploadFile = File(...)):
     
     # Only load heavy Keras model when a video is scanned
     if deepfake_model is None:
-        deepfake_model = load_model("models/deepfake_detection_vibe_model.h5")
+        deepfake_model = load_model("models/truth_shield_model.h5")
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
         tmp.write(await file.read())

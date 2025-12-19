@@ -48,7 +48,7 @@ export function Navbar() {
             className="flex items-center gap-2 text-foreground hover:text-primary transition-colors"
           >
             <Shield className="w-8 h-8 text-primary" />
-            <span className="font-bold text-xl">TruthGuard</span>
+            <span className="font-bold text-xl">TRUTH-SHIELD</span>
           </a>
 
           {/* Desktop Navigation */}

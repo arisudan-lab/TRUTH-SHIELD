@@ -2,7 +2,7 @@ name: Keep TruthShield Alive
 
 on:
   schedule:
-    - cron: "*/10 * * * *" # Every 10 minutes is better (GitHub often ignores 2-minute requests)
+    - cron: "*/5 * * * *" # Every 10 minutes is better (GitHub often ignores 2-minute requests)
   workflow_dispatch:      # This adds the manual "Run" button!
 
 jobs:
