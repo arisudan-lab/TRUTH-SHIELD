@@ -6,8 +6,6 @@ import numpy as np
 import cv2
 import tempfile
 import os
-
-# We import load_model here, but don't call it yet
 from keras.models import load_model
 
 app = FastAPI(title="TruthGuard - Fake News & Deepfake Detector")
@@ -28,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global variables to store models once loaded
+# Global variables for Lazy Loading
 vectorizer = None
 news_model = None
 deepfake_model = None
@@ -40,15 +38,13 @@ class NewsRequest(BaseModel):
 async def root():
     return {"message": "TruthGuard API is running"}
 
-# ===== FAKE NEWS ENDPOINT =====
 @app.post("/api/predict")
 async def predict(news: NewsRequest):
     global vectorizer, news_model
-    
     if not news.text.strip():
-        raise HTTPException(status_code=400, detail="News text cannot be empty")
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
 
-    # LAZY LOAD: Only load text models if they aren't in memory yet
+    # Only load text models when first used
     if vectorizer is None:
         vectorizer = joblib.load("models/vectorizer.jb")
     if news_model is None:
@@ -56,81 +52,52 @@ async def predict(news: NewsRequest):
 
     transform_input = vectorizer.transform([news.text])
     raw_pred = news_model.predict(transform_input)[0]
-    pred_int = int(raw_pred)
-    label = "Real" if pred_int == 1 else "Fake"
-
+    label = "Real" if int(raw_pred) == 1 else "Fake"
+    
     try:
-        proba = news_model.predict_proba(transform_input)[0].max()
-        confidence = float(proba)
-    except Exception:
+        confidence = float(news_model.predict_proba(transform_input)[0].max())
+    except:
         confidence = 0.0
 
-    return {
-        "prediction": label,
-        "confidence": confidence,
-        "is_real": bool(pred_int == 1),
-    }
+    return {"prediction": label, "confidence": confidence, "is_real": bool(int(raw_pred) == 1)}
 
-# ===== DEEPFAKE DETECTION HELPERS =====
-def extract_frames(video_path: str, num_frames: int = 10):
+def extract_frames(video_path, num_frames=10):
     cap = cv2.VideoCapture(video_path)
     frames = []
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    if total_frames <= 0:
-        cap.release()
-        return None
-
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if total <= 0: return None
     for i in range(num_frames):
-        cap.set(cv2.CAP_PROP_POS_FRAMES, i * (total_frames // num_frames))
+        cap.set(cv2.CAP_PROP_POS_FRAMES, i * (total // num_frames))
         ret, frame = cap.read()
         if ret:
-            frame = cv2.resize(frame, (224, 224))
-            frame = frame / 255.0
-            frames.append(frame)
-
+            frames.append(cv2.resize(frame, (224, 224)) / 255.0)
     cap.release()
     return np.array(frames) if frames else None
 
-# ===== DEEPFAKE DETECTION ENDPOINT =====
 @app.post("/api/deepfake-detect")
 async def detect_deepfake(file: UploadFile = File(...)):
     global deepfake_model
     
-    if not file.filename.lower().endswith((".mp4", ".mov", ".avi", ".mkv")):
-        raise HTTPException(status_code=400, detail="Invalid video format")
+    # Only load heavy Keras model when a video is scanned
+    if deepfake_model is None:
+        deepfake_model = load_model("models/deepfake_detection_vibe_model.h5")
 
-    try:
-        # LAZY LOAD: Only load the heavy Keras model when a video is uploaded
-        if deepfake_model is None:
-            print("Loading deepfake model into memory...")
-            deepfake_model = load_model("models/deepfake_detection_vibe_model.h5")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_file:
-            content = await file.read()
-            tmp_file.write(content)
-            tmp_path = tmp_file.name
-
-        frames = extract_frames(tmp_path, num_frames=10)
-        if frames is None:
-            os.remove(tmp_path)
-            raise HTTPException(status_code=400, detail="Could not process video")
-
-        predictions = deepfake_model.predict(frames)
-        avg_prediction = float(np.mean(predictions))
-
-        is_real = avg_prediction < 0.5
-        label = "REAL" if is_real else "FAKE"
-        confidence = abs(avg_prediction - 0.5) * 2
-
+    frames = extract_frames(tmp_path)
+    if frames is None:
         os.remove(tmp_path)
+        raise HTTPException(status_code=400, detail="Invalid video")
 
-        return {
-            "prediction": label,
-            "confidence": confidence,
-            "is_real": is_real,
-            "raw_score": avg_prediction,
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+    preds = deepfake_model.predict(frames)
+    avg_pred = float(np.mean(preds))
+    is_real = avg_pred < 0.5
+    
+    os.remove(tmp_path)
+    return {
+        "prediction": "REAL" if is_real else "FAKE",
+        "confidence": abs(avg_pred - 0.5) * 2,
+        "is_real": is_real
+    }
