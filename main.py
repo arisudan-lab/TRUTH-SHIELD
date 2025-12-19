@@ -11,9 +11,16 @@ from keras.models import load_model
 app = FastAPI(title="TruthGuard - Fake News & Deepfake Detector")
 
 # CORS setup
+origins = [
+    "http://localhost:3000",
+    "http://localhost:8080",
+    "https://truth-shield-navy.vercel.app",   # Vercel frontend
+    "https://truthshield-7j3r.onrender.com",  # optional: backend URL
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://localhost:3000"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -60,17 +67,17 @@ async def predict(news: NewsRequest):
     }
 
 
-# ===== DEEPFAKE DETECTION ENDPOINT =====
-def extract_frames(video_path, num_frames=10):
-    """Extract frames from video"""
+# ===== DEEPFAKE DETECTION HELPERS =====
+def extract_frames(video_path: str, num_frames: int = 10):
+    """Extract frames from video for deepfake detection."""
     cap = cv2.VideoCapture(video_path)
     frames = []
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    
+
     if total_frames <= 0:
         cap.release()
         return None
-    
+
     for i in range(num_frames):
         cap.set(cv2.CAP_PROP_POS_FRAMES, i * (total_frames // num_frames))
         ret, frame = cap.read()
@@ -78,50 +85,58 @@ def extract_frames(video_path, num_frames=10):
             frame = cv2.resize(frame, (224, 224))
             frame = frame / 255.0
             frames.append(frame)
-    
+
     cap.release()
     return np.array(frames) if frames else None
 
 
+# ===== DEEPFAKE DETECTION ENDPOINT =====
 @app.post("/api/deepfake-detect")
 async def detect_deepfake(file: UploadFile = File(...)):
-    """Detect deepfake in uploaded video"""
-    
-    if not file.filename.lower().endswith(('.mp4', '.mov', '.avi', '.mkv')):
-        raise HTTPException(status_code=400, detail="Invalid file format. Supported: MP4, MOV, AVI, MKV")
-    
+    """Detect deepfake in uploaded video."""
+
+    if not file.filename.lower().endswith((".mp4", ".mov", ".avi", ".mkv")):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file format. Supported: MP4, MOV, AVI, MKV",
+        )
+
     try:
         # Save temp file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_file:
             content = await file.read()
             tmp_file.write(content)
             tmp_path = tmp_file.name
-        
+
         # Extract frames
         frames = extract_frames(tmp_path, num_frames=10)
         if frames is None:
+            os.remove(tmp_path)
             raise HTTPException(status_code=400, detail="Could not process video")
-        
+
         # Predict
         predictions = deepfake_model.predict(frames)
         avg_prediction = float(np.mean(predictions))
-        
-        # Determine if real or fake (adjust threshold as needed)
+
+        # Determine if real or fake
         is_real = avg_prediction < 0.5
         label = "REAL" if is_real else "FAKE"
-        confidence = abs(avg_prediction - 0.5) * 2  # Convert to 0-1 confidence
-        
+        confidence = abs(avg_prediction - 0.5) * 2  # 0–1 confidence
+
         # Cleanup
         os.remove(tmp_path)
-        
+
         return {
             "prediction": label,
             "confidence": confidence,
             "is_real": is_real,
-            "raw_score": avg_prediction
+            "raw_score": avg_prediction,
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing video: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error processing video: {str(e)}"
+        )
+
