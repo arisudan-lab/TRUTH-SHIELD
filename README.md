@@ -49,9 +49,6 @@ Copy and paste these into the "Analyze Text" section:
 
 ---
 
-## 💻 Local Usage & Development
-
-To run the project locally, follow these steps:
 
 ## 💻 Local Usage & Development
 
@@ -100,9 +97,9 @@ Contributions are welcome! If you're using this for a hackathon, feel free to fo
 
 ## 👤 Author
 Developed by 
-    Arisudan Pradhan
-    Rishav Pal
-    Sneha Naskar
+    Arisudan Pradhan\n
+    Rishav Pal\n
+    Sneha Naskar\n
     Sujal Das
 
 
